@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>a</title>
+    <style>
+        div.table {
+            display: table;
+        }
+
+        div.table_hidden {
+            display: table;
+        }
+
+        div.row {
+            display: table-row;
+        }
+
+        div.row_hidden {
+            display: table-row;
+        }
+
+        div.table>div.row>div {
+            display: table-cell;
+            border-style: groove;
+        }
+
+        div.table_hidden>div.row>div {
+            display: table-cell;
+            border-style: none;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script src="jquery.simple-color.min.js"></script>
+    <script src="unzip.min.js"></script>
+    <script src="classChat.js"></script>
+    <script type="text/javascript">
+        var styles = {};
+        function utf8ArrayToStr(array) {
+            var out, i, len, c;
+            var char2, char3;
+
+            out = "";
+            len = array.length;
+            i = 0;
+            while (i < len) {
+                c = array[i++];
+                switch (c >> 4) {
+                    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+                        // 0xxxxxxx
+                        out += String.fromCharCode(c);
+                        break;
+                    case 12: case 13:
+                        // 110x xxxx   10xx xxxx
+                        char2 = array[i++];
+                        out += String.fromCharCode(((c & 0x1F) << 6) | (char2 & 0x3F));
+                        break;
+                    case 14:
+                        // 1110 xxxx  10xx xxxx  10xx xxxx
+                        char2 = array[i++];
+                        char3 = array[i++];
+                        out += String.fromCharCode(((c & 0x0F) << 12) |
+                            ((char2 & 0x3F) << 6) |
+                            ((char3 & 0x3F) << 0));
+                        break;
+                }
+            }
+
+            return out;
+        }
+
+        function applyStyles() {
+            console.log(styles);
+            Object.keys(styles).forEach(s => {
+                $(s).css(styles[s]);
+            });
+        }
+
+        function resetStyles() {
+            console.log(styles);
+            Object.keys(styles).forEach(s => {
+                $(s).css(styles[s]);
+            });
+        }
+
+        function serialize(dom) {
+            var obj = {
+                tagName: dom.tagName,
+                attributes: Array.prototype.slice.call(dom.attributes, 0, dom.attributes.length).map(function (attr) {
+                    return { name: attr.name, value: attr.textContent }
+                }),
+                content: dom.textContent,
+                children: Array.prototype.map.call(dom.children, function (e) {
+                    return serialize(e);
+                })
+            };
+            return obj;
+        }
+
+        var loadXmlFile = function (text_xml) {
+            //var text_xml = file.target.result;
+            var dom_obj = null;
+            // ------------------------------------------------------------
+            // DOMParser オブジェクトを作成する
+            // ------------------------------------------------------------
+            var dom_parser = new DOMParser();
+
+            // ------------------------------------------------------------
+            // XML 文字列から Document オブジェクトを作成する
+            // ------------------------------------------------------------
+            var document_obj = null;
+
+            // ------------------------------------------------------------
+            // XML 文字列から Document オブジェクトを作成する
+            // ------------------------------------------------------------
+            document_obj = dom_parser.parseFromString(text_xml, "application/xml");
+
+            // ------------------------------------------------------------
+            // パースに失敗したか調べる
+            // ------------------------------------------------------------
+            if (document_obj.getElementsByTagName("parsererror").length) {
+                document_obj = null;
+            }
+
+            // パースに成功した
+            if (document_obj) {
+                dom_obj = serialize(document_obj.children[0]);
+            }
+            return dom_obj;
+        }
+
+        var clearHtml = function () {
+            $('.sample').empty();
+        }
+
+        var generateHtml = function (zip_file) {
+            clearHtml();
+            console.log(zip_file);
+            try {
+                var text_xml = unzip(zip_file, 'chat.xml');
+                dom_obj = loadXmlFile(text_xml);
+                if (!dom_obj) {
+                    throw "Invalid XML File.";
+                }
+                // ------------------------------------------------------------
+                // HTMLの生成
+                // ------------------------------------------------------------
+                chat = new Chat(dom_obj);
+                console.log(chat.allElements);
+                chat.allElements.forEach(e => {
+                    $('.sample').append(
+                        e.html
+                    );
+                });
+                generateColorSelector(chat);
+            } catch (e) {
+                alert('Error: ' + e);
+            }
+        }
+
+        var generateColorSelector = function (chat) {
+            $('#color_selector').empty();
+            chat.allPlayers.forEach(p => {
+                var $table_row = $('<div class="row">');
+                var $table_cell_0 = $('<div>');
+                var $table_cell_1 = $('<div>');
+                var css_id = '.color_' + p.id;
+                $table_cell_0.append(
+                    $('<input>')
+                        .attr("id", 'color_selector_' + p.id)
+                        .attr("value", '#000000')
+                );
+                $table_cell_1.append(p.name);
+                $table_row
+                    .append($table_cell_0)
+                    .append($table_cell_1);
+                $('#color_selector').append($table_row);
+                $('#color_selector_' + p.id).simpleColor({
+                    boxHeight: 20,
+                    boxWidth: 20,
+                    cellWidth: 16,
+                    cellHeight: 16,
+                    onSelect: function (hex, element) {
+                        $(css_id).css({
+                            color: '#' + hex,
+                        });
+                    }
+                });
+            });
+        }
+
+        function convertToHTML(elem) {
+            return jQuery('<div>').append(elem.clone(true)).html();
+        }
+
+        function unzip(zip_file, file_path) {
+            var zipArr = new Uint8Array(zip_file.target.result);
+            var unzip = new Zlib.Unzip(zipArr);
+            var importFileList = unzip.getFilenames();
+
+            var isExist = false;
+
+            for (var i in importFileList) {
+                var importFile = importFileList[i];
+                if (importFile === file_path) {
+                    isExist = true;
+                }
+            }
+
+            if (!isExist) {
+                log('File does not exist. file_path=' + file_path);
+                return;
+            }
+
+            var buffer = utf8ArrayToStr(unzip.decompress(file_path));
+            return buffer;
+        }
+
+        $(document).on("change", "[id^='file1']", function (e) {
+            var file = e.target.files[0];
+            if (file === undefined) {
+                alert('ファイルが選択されていません。');
+                return false;
+            }
+            var reader = new FileReader();
+            reader.onload = generateHtml;
+            reader.readAsArrayBuffer(e.target.files[0]);
+        });
+
+        $(document).on('click', "[id^='file2']", function () {
+            var header = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>チャットログ</title></head><body>';
+            var main = convertToHTML($('.sample'));
+            var footer = '</body></html>';
+            var doc = header + main + footer;
+            var blob = new Blob([doc], { "type": "text/plain" });
+            $("<a></a>", {
+                href: window.URL.createObjectURL(blob),
+                download: "log.html",
+                target: "_blank"
+            })[0].click();
+        });
+    </script>
+</head>
+
+<body>
+    <div class="table">
+        <div class="row">
+            <div>
+                ファイル(zip)
+            </div>
+            <div>
+                <input type="file" id="file1">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                保存(html)
+            </div>
+            <div>
+                <input type="button" id="file2" value="保存">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                文字色の設定
+            </div>
+            <div class="table_hidden" id="color_selector">
+            </div>
+        </div>
+    </div>
+    <div class="table">
+        <div class="row">
+            <div>
+                プレビュー
+            </div>
+        </div>
+        <div class="row">
+            <div class="sample">
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
